@@ -18,22 +18,15 @@
 
 package io.siddhi.extension.io.s3.sink.internal.publisher;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PutObjectRequest;
 import io.siddhi.extension.io.s3.sink.internal.beans.EventObject;
-
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Paths;
+import io.siddhi.extension.io.s3.sink.internal.utils.ServiceClient;
 
 public class PublisherTask implements Runnable {
 
-    private AmazonS3 client;
+    private final ServiceClient client;
     private EventObject eventObject;
 
-    public PublisherTask(EventObject eventObject, AmazonS3 client) {
+    public PublisherTask(EventObject eventObject, ServiceClient client) {
         this.eventObject = eventObject;
         this.client = client;
     }
@@ -41,31 +34,6 @@ public class PublisherTask implements Runnable {
     @Override
     public void run() {
         System.out.println(">>>>>>>>>>> Publishing event " + eventObject);
-        String content = buildObjectContent();
-        InputStream inputStream = new ByteArrayInputStream(content.getBytes());
-
-        ObjectMetadata metadata = new ObjectMetadata();
-        try {
-            metadata.setContentLength(inputStream.available());
-        } catch (IOException e) {
-            // Ignore setting content length
-        }
-        metadata.setContentType("application/octet-stream");
-
-        PutObjectRequest request = new PutObjectRequest(eventObject.getBucketName(), buildKey(), inputStream, metadata);
-        this.client.putObject(request);
-    }
-
-    private String buildKey() {
-        String fileName = String.format("FooStream-%d.json", eventObject.getOffset());
-        return Paths.get(eventObject.getObjectPath(), fileName).toString();
-    }
-
-    private String buildObjectContent() {
-        StringBuilder sb = new StringBuilder();
-        this.eventObject.getEvents().forEach(e -> {
-            sb.append(e.toString()).append("\n");
-        });
-        return sb.toString();
+        this.client.uploadObject(eventObject);
     }
 }

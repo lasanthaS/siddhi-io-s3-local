@@ -21,6 +21,4 @@ package io.siddhi.extension.io.s3.sink.internal;
 public interface RotationStrategy {
 
     void queueEvent(String objectPath, Object event);
-
-    void publish(int workerCount);
 }

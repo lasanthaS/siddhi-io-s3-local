@@ -32,6 +32,8 @@ public class SinkConfig {
     private int rotateIntetrvalMs = -1;
     private int rotateScheduledIntervalMs = -1;
 
+    private String contentType = "application/octet-stream";
+
     public SinkConfig() {
     }
 
@@ -113,5 +115,13 @@ public class SinkConfig {
 
     public void setRotateScheduledIntervalMs(int rotateScheduledIntervalMs) {
         this.rotateScheduledIntervalMs = rotateScheduledIntervalMs;
+    }
+
+    public String getContentType() {
+        return contentType;
+    }
+
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
     }
 }

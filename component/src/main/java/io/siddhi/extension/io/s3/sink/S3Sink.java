@@ -35,6 +35,7 @@ import io.siddhi.core.util.transport.OptionHolder;
 import io.siddhi.extension.io.s3.sink.internal.utils.S3Constants;
 import io.siddhi.extension.io.s3.sink.internal.publisher.EventPublisher;
 import io.siddhi.extension.io.s3.sink.internal.beans.SinkConfig;
+import io.siddhi.extension.io.s3.sink.internal.utils.ServiceClient;
 import io.siddhi.query.api.definition.StreamDefinition;
 
 /**
@@ -290,9 +291,6 @@ public class S3Sink extends Sink {
     @Override
     public void connect() throws ConnectionUnavailableException {
         this.publisher = new EventPublisher(this.config, this.optionHolder);
-//        this.publisher.connect();
-//        this.publisher.createBucketIfNotExist();
-        this.publisher.startPublisher();
     }
 
     /**
@@ -301,7 +299,7 @@ public class S3Sink extends Sink {
      */
     @Override
     public void disconnect() {
-        // Not applicable
+        // todo publish all queued events before shutdown
     }
 
     /**
@@ -310,8 +308,7 @@ public class S3Sink extends Sink {
      */
     @Override
     public void destroy() {
-        // todo publish all queued events before shutdown
-//        System.out.println(">>>>>>>>>>> WRITE ALL THE QUEUED EVENTS BEFORE DESTROYING!!!");
+        // Not applicable
     }
 
     /**

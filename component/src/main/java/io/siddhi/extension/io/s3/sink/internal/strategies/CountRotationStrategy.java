@@ -18,33 +18,32 @@
 
 package io.siddhi.extension.io.s3.sink.internal.strategies;
 
-import com.amazonaws.services.s3.AmazonS3;
 import io.siddhi.extension.io.s3.sink.internal.RotationStrategy;
 import io.siddhi.extension.io.s3.sink.internal.beans.EventObject;
 import io.siddhi.extension.io.s3.sink.internal.beans.SinkConfig;
-import io.siddhi.extension.io.s3.sink.internal.publisher.EventPublisherThreadPoolExecutor;
 import io.siddhi.extension.io.s3.sink.internal.publisher.PublisherTask;
+import io.siddhi.extension.io.s3.sink.internal.utils.ServiceClient;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 public class CountRotationStrategy implements RotationStrategy {
-    private AmazonS3 client;
+    private BlockingQueue<Runnable> taskQueue;
+    private ServiceClient client;
     private String bucketName;
     private int flushSize;
+    private String contentType;
 
     private Map<String, Integer> eventOffsetMap = new HashMap<>();
     private Map<String, EventObject> eventObjectMap = new HashMap<>();
 
-    private BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
-
-    public CountRotationStrategy(SinkConfig config, AmazonS3 client) {
+    public CountRotationStrategy(SinkConfig config, ServiceClient client, BlockingQueue<Runnable> taskQueue) {
         this.flushSize = config.getFlushSize();
         this.bucketName = config.getBucketName();
+        this.contentType = config.getContentType();
         this.client = client;
+        this.taskQueue = taskQueue;
     }
 
     @Override
@@ -58,23 +57,17 @@ public class CountRotationStrategy implements RotationStrategy {
                     + " events. Offset: " + eventObject.getOffset());
 
             taskQueue.add(new PublisherTask(eventObject, client));
-            eventObjectMap.replace(objectPath, new EventObject(bucketName, objectPath, getEventOffset(objectPath)));
+            eventObjectMap.replace(objectPath, new CountRotationEventObject(
+                    bucketName, objectPath, getEventOffset(objectPath), contentType));
 
             System.out.println(">>>>>>>>>>> Queue contains " + taskQueue.size() + " tasks.");
         }
     }
 
-    @Override
-    public void publish(int numExecutors) {
-        EventPublisherThreadPoolExecutor executor = new EventPublisherThreadPoolExecutor(
-                10, 20, 5000, TimeUnit.MILLISECONDS, this.taskQueue);
-        executor.prestartAllCoreThreads();
-    }
-
-    private EventObject getOrCreateEventObject(String objectPath ) {
+    private EventObject getOrCreateEventObject(String objectPath) {
         EventObject eventObject = eventObjectMap.get(objectPath);
         if (eventObject == null) {
-            eventObject = new EventObject(bucketName, objectPath, getEventOffset(objectPath));
+            eventObject = new CountRotationEventObject(bucketName, objectPath, getEventOffset(objectPath), contentType);
             eventObjectMap.put(objectPath, eventObject);
         }
         return eventObject;

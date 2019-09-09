@@ -18,19 +18,22 @@
 
 package io.siddhi.extension.io.s3.sink.internal.beans;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-public class EventObject {
+public abstract class EventObject {
     private String objectPath;
     private List<Object> events;
     private int offset;
     private String bucketName;
+    private String contentType;
 
-    public EventObject(String bucketName, String objectPath, int offset) {
+    public EventObject(String bucketName, String objectPath, int offset, String contentType) {
         this.bucketName = bucketName;
         this.objectPath = objectPath;
         this.offset = offset;
+        this.contentType = contentType;
         this.events = new ArrayList<>();
 
         System.out.println(">>>>>>>>>>> EventObject created with offset: " + offset);
@@ -76,12 +79,18 @@ public class EventObject {
         return this.events.size();
     }
 
-    public String serialize() {
-        return this.toString();
+    public String getContentType() {
+        return contentType;
+    }
+
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
     }
 
     @Override
     public String toString() {
         return String.format("Event[offset=%s, path=%s, count=%s]", this.offset, this.objectPath, this.events.size());
     }
+
+    public abstract InputStream serialize();
 }
