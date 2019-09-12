@@ -18,8 +18,6 @@
 
 package io.siddhi.extension.io.s3.sink.internal;
 
-import java.util.Map;
-
 public interface RotationStrategy {
 
     void queueEvent(String objectPath, Object event);

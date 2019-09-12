@@ -32,25 +32,17 @@ public class CountBasedRotationStrategy implements RotationStrategy {
 
     private static final Logger logger = Logger.getLogger(CountBasedRotationStrategy.class);
 
-    private BlockingQueue<Runnable> taskQueue;
+    private SinkConfig config;
     private ServiceClient client;
-    private String bucketName;
-    private String contentType;
-    private String streamId;
-    private String mapType;
-    private int flushSize;
+    private BlockingQueue<Runnable> taskQueue;
 
     private Map<String, Integer> eventOffsetMap = new HashMap<>();
     private Map<String, CountBasedEventObject> eventObjectMap = new HashMap<>();
 
     public CountBasedRotationStrategy(SinkConfig config, ServiceClient client, BlockingQueue<Runnable> taskQueue) {
-        this.flushSize = config.getFlushSize();
-        this.bucketName = config.getBucketName();
-        this.contentType = config.getContentType();
+        this.config = config;
         this.client = client;
         this.taskQueue = taskQueue;
-        this.streamId = config.getStreamId();
-        this.mapType = config.getMapType();
     }
 
     @Override
@@ -59,12 +51,12 @@ public class CountBasedRotationStrategy implements RotationStrategy {
         eventObject.addEvent(payload);
         incrementEventOffset(objectPath);
 
-        if (eventObject.getEventCount() % flushSize == 0) {
+        if (eventObject.getEventCount() % this.config.getFlushSize() == 0) {
             logger.info("Queuing the event object with " + eventObject.getEventCount() + " events. Offset: " + eventObject.getOffset());
 
             taskQueue.add(new PublisherTask(eventObject, client));
-            eventObjectMap.replace(objectPath, new CountBasedEventObject(
-                    bucketName, objectPath, getEventOffset(objectPath), contentType, streamId, mapType));
+            eventObjectMap.replace(objectPath,
+                    new CountBasedEventObject(this.config, objectPath, getEventOffset(objectPath)));
 
             logger.info("Queue contains " + taskQueue.size() + " tasks.");
         }
@@ -78,7 +70,7 @@ public class CountBasedRotationStrategy implements RotationStrategy {
     private CountBasedEventObject getOrCreateEventObject(String objectPath) {
         CountBasedEventObject eventObject = eventObjectMap.get(objectPath);
         if (eventObject == null) {
-            eventObject = new CountBasedEventObject(bucketName, objectPath, getEventOffset(objectPath), contentType, streamId, mapType);
+            eventObject = new CountBasedEventObject(this.config, objectPath, getEventOffset(objectPath));
             eventObjectMap.put(objectPath, eventObject);
         }
         return eventObject;

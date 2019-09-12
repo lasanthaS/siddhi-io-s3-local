@@ -27,19 +27,14 @@ public class SinkConfig {
     private String awsSecretKey = null;
     private String bucketName = null;
     private String awsRegion = Regions.DEFAULT_REGION.getName();
-    private boolean versioningEnabled;
+    private String streamId;
+    private String mapType;
+    private String contentType = "application/octet-stream";
+    private String bucketAcl = "";
     private int flushSize = -1;
     private int rotateIntetrvalMs = -1;
     private int rotateScheduledIntervalMs = -1;
-    private String streamId;
-    private String mapType;
-
-    private int metadataIndex = -1;
-
-    private String contentType = "application/octet-stream";
-
-    public SinkConfig() {
-    }
+    private boolean versioningEnabled = false;
 
     public String getStorageClass() {
         return storageClass;
@@ -89,12 +84,36 @@ public class SinkConfig {
         this.awsRegion = awsRegion;
     }
 
-    public boolean isVersioningEnabled() {
-        return versioningEnabled;
+    public String getStreamId() {
+        return streamId;
     }
 
-    public void setVersioningEnabled(boolean versioningEnabled) {
-        this.versioningEnabled = versioningEnabled;
+    public void setStreamId(String streamId) {
+        this.streamId = streamId;
+    }
+
+    public String getMapType() {
+        return mapType;
+    }
+
+    public void setMapType(String mapType) {
+        this.mapType = mapType;
+    }
+
+    public String getContentType() {
+        return contentType;
+    }
+
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
+    }
+
+    public String getBucketAcl() {
+        return bucketAcl;
+    }
+
+    public void setBucketAcl(String bucketAcl) {
+        this.bucketAcl = bucketAcl;
     }
 
     public int getFlushSize() {
@@ -121,35 +140,11 @@ public class SinkConfig {
         this.rotateScheduledIntervalMs = rotateScheduledIntervalMs;
     }
 
-    public String getContentType() {
-        return contentType;
+    public boolean isVersioningEnabled() {
+        return versioningEnabled;
     }
 
-    public void setContentType(String contentType) {
-        this.contentType = contentType;
-    }
-
-    public String getStreamId() {
-        return streamId;
-    }
-
-    public void setStreamId(String streamId) {
-        this.streamId = streamId;
-    }
-
-    public String getMapType() {
-        return mapType;
-    }
-
-    public void setMapType(String mapType) {
-        this.mapType = mapType;
-    }
-
-    public int getMetadataIndex() {
-        return metadataIndex;
-    }
-
-    public void setMetadataIndex(int metadataIndex) {
-        this.metadataIndex = metadataIndex;
+    public void setVersioningEnabled(boolean versioningEnabled) {
+        this.versioningEnabled = versioningEnabled;
     }
 }

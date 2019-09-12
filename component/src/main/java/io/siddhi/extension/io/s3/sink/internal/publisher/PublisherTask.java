@@ -36,7 +36,7 @@ public class PublisherTask implements Runnable {
 
     @Override
     public void run() {
-        logger.info("Publishing event: " + eventObject);
+        logger.info("Publishing event object: " + eventObject);
         this.client.uploadObject(eventObject);
     }
 }

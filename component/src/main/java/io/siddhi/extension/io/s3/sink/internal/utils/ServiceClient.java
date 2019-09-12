@@ -24,6 +24,7 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.AccessControlList;
 import com.amazonaws.services.s3.model.BucketVersioningConfiguration;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
@@ -42,21 +43,22 @@ public class ServiceClient {
 
     public ServiceClient(SinkConfig config) {
         this.config = config;
-        this.init();
+        this.client = this.buildClient();
         this.createBucketIfNotExist();
     }
 
-    private void init() {
+    private AmazonS3 buildClient() {
         AmazonS3ClientBuilder builder = AmazonS3ClientBuilder.standard()
                 .withRegion(config.getAwsRegion());
-        AWSCredentialsProvider credentialProvider = getCredentialProvider(true);
+        AWSCredentialsProvider credentialProvider = this.getCredentialProvider(true);
         if (credentialProvider != null) {
             builder.withCredentials(credentialProvider);
         }
-        this.client = builder.build();
+        return builder.build();
     }
 
     private AWSCredentialsProvider getCredentialProvider(boolean overrideForTesting) {
+        // todo remove this condition along with the parameter once the extension is completed
         if (overrideForTesting) {
             return new ProfileCredentialsProvider();
         }
@@ -78,20 +80,27 @@ public class ServiceClient {
     }
 
     public void createBucketIfNotExist() {
+        // NOTE: The bucket.acl and versioning.enabled flags will only be effective if the bucket is not available.
+
         // Check if the bucket exists. If so skip the rest of the code.
         if (this.client.doesBucketExistV2(config.getBucketName())) {
             return;
         }
 
         // Create the bucket.
-        this.client.createBucket(new CreateBucketRequest(config.getBucketName(), config.getAwsRegion()));
+        CreateBucketRequest createBucketRequest = new CreateBucketRequest(config.getBucketName(), config.getAwsRegion());
+        AccessControlList acl = buildBucketACL();
+        if (acl != null) {
+            createBucketRequest.withAccessControlList(acl);
+        }
+        this.client.createBucket(createBucketRequest);
 
         // Enable versioning only if the config flag is set.
         if (config.isVersioningEnabled()) {
-            BucketVersioningConfiguration versioningConfiguration = new BucketVersioningConfiguration()
-                    .withStatus(BucketVersioningConfiguration.ENABLED);
-            this.client.setBucketVersioningConfiguration(
-                    new SetBucketVersioningConfigurationRequest(config.getBucketName(), versioningConfiguration));
+            SetBucketVersioningConfigurationRequest bucketVersioningConfigurationRequest =
+                    new SetBucketVersioningConfigurationRequest(config.getBucketName(),
+                            new BucketVersioningConfiguration().withStatus(BucketVersioningConfiguration.ENABLED));
+            this.client.setBucketVersioningConfiguration(bucketVersioningConfigurationRequest);
         }
     }
 
@@ -99,16 +108,24 @@ public class ServiceClient {
         InputStream inputStream = eventObject.serialize();
 
         ObjectMetadata metadata = new ObjectMetadata();
-        metadata.setContentType(eventObject.getContentType());
+        metadata.setContentType(eventObject.getConfig().getContentType());
         try {
             metadata.setContentLength(inputStream.available());
         } catch (IOException e) {
             // Ignore setting content length
         }
 
-        PutObjectRequest request = new PutObjectRequest(eventObject.getBucketName(), buildKey(eventObject),
-                inputStream, metadata);
-        this.client.putObject(request);
+        PutObjectRequest putObjectRequest = new PutObjectRequest(
+                eventObject.getConfig().getBucketName(), buildKey(eventObject), inputStream, metadata);
+        if (config.getStorageClass() != null && !config.getStorageClass().isEmpty()) {
+            putObjectRequest.setStorageClass(config.getStorageClass());
+        }
+        this.client.putObject(putObjectRequest);
+    }
+
+    private AccessControlList buildBucketACL() {
+        // todo build the bucket acl from the bucket.acl parameter
+        return null;
     }
 
     private String buildKey(EventObject eventObject) {

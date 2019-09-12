@@ -23,13 +23,12 @@ import io.siddhi.core.util.transport.OptionHolder;
 import io.siddhi.extension.io.s3.sink.internal.RotationStrategy;
 import io.siddhi.extension.io.s3.sink.internal.beans.SinkConfig;
 import io.siddhi.extension.io.s3.sink.internal.strategies.countbased.CountBasedRotationStrategy;
+import io.siddhi.extension.io.s3.sink.internal.strategies.interval.IntervalBasedRotationStrategy;
 import io.siddhi.extension.io.s3.sink.internal.utils.S3Constants;
 import io.siddhi.extension.io.s3.sink.internal.utils.ServiceClient;
 import org.apache.log4j.Logger;
 
-import java.util.Map;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -42,24 +41,44 @@ public class EventPublisher {
     private OptionHolder optionHolder;
     private SinkConfig config;
     private BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
+    private EventPublisherThreadPoolExecutor executor;
 
     public EventPublisher(SinkConfig config, OptionHolder optionHolder) {
         this.optionHolder = optionHolder;
         this.config = config;
         this.client = new ServiceClient(config);
-        this.rotationStrategy = new CountBasedRotationStrategy(config, client, taskQueue);
+        this.rotationStrategy = initRotationStrategy();
 
         logger.info(this.rotationStrategy.getName() + " rotation strategy has been selected.");
 
-        EventPublisherThreadPoolExecutor executor = new EventPublisherThreadPoolExecutor(
+        this.executor = new EventPublisherThreadPoolExecutor(
                 S3Constants.CORE_POOL_SIZE, S3Constants.MAX_POOL_SIZE, S3Constants.KEEP_ALIVE_TIME_MS,
                 TimeUnit.MILLISECONDS, this.taskQueue);
-        executor.prestartAllCoreThreads();
+        this.executor.prestartAllCoreThreads();
     }
 
     public void publish(Object payload, DynamicOptions dynamicOptions) {
         String objectPath = optionHolder.validateAndGetOption(S3Constants.OBJECT_PATH).getValue(dynamicOptions);
-        logger.info("Queuing the event for publishing: " + payload);
+        logger.debug("Queuing the event for publishing: " + payload);
         rotationStrategy.queueEvent(objectPath, payload);
+    }
+
+    public void shutdown() {
+        logger.info("Shutting down worker threads.");
+        if (this.executor != null) {
+            this.executor.shutdown();
+        }
+    }
+
+    private RotationStrategy initRotationStrategy() {
+//        if (this.config.getRotateIntetrvalMs() > -1) {
+//            return new IntervalBasedRotationStrategy(config, client, taskQueue);
+//        }
+
+        // If the 'flush.size' is not set, make it 1 and initialize the count based strategy.
+        if (this.config.getFlushSize() == -1) {
+            this.config.setFlushSize(1);
+        }
+        return new CountBasedRotationStrategy(config, client, taskQueue);
     }
 }

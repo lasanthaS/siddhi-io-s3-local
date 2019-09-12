@@ -24,28 +24,22 @@ import java.util.List;
 import java.util.Map;
 
 public abstract class EventObject {
-    private String objectPath;
-    private List<Object> events;
-    private String bucketName;
-    private String contentType;
-    private String streamId;
-    private String mapType;
+    protected SinkConfig config;
+    protected String objectPath;
+    protected List<Object> events;
 
-    public EventObject(String bucketName, String objectPath, String contentType, String streamId, String mapType) {
-        this.bucketName = bucketName;
+    public EventObject(SinkConfig config, String objectPath) {
+        this.config = config;
         this.objectPath = objectPath;
-        this.contentType = contentType;
         this.events = new ArrayList<>();
-        this.streamId = streamId;
-        this.mapType = mapType;
     }
 
-    public String getBucketName() {
-        return bucketName;
+    public SinkConfig getConfig() {
+        return config;
     }
 
-    public void setBucketName(String bucketName) {
-        this.bucketName = bucketName;
+    public void setConfig(SinkConfig config) {
+        this.config = config;
     }
 
     public String getObjectPath() {
@@ -72,22 +66,6 @@ public abstract class EventObject {
         return this.events.size();
     }
 
-    public String getContentType() {
-        return contentType;
-    }
-
-    public void setContentType(String contentType) {
-        this.contentType = contentType;
-    }
-
-    public String getStreamId() {
-        return streamId;
-    }
-
-    public void setStreamId(String streamId) {
-        this.streamId = streamId;
-    }
-
     @Override
     public String toString() {
         return String.format("Event[path=%s, count=%s]", this.objectPath, this.events.size());
@@ -96,12 +74,4 @@ public abstract class EventObject {
     public abstract InputStream serialize();
 
     public abstract String getObjectKey();
-
-    public String getMapType() {
-        return mapType;
-    }
-
-    public void setMapType(String mapType) {
-        this.mapType = mapType;
-    }
 }

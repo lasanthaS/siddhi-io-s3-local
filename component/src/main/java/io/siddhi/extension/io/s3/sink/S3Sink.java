@@ -25,6 +25,7 @@ import io.siddhi.annotation.util.DataType;
 import io.siddhi.core.config.SiddhiAppContext;
 import io.siddhi.core.event.Event;
 import io.siddhi.core.exception.ConnectionUnavailableException;
+import io.siddhi.core.exception.SiddhiAppCreationException;
 import io.siddhi.core.stream.ServiceDeploymentInfo;
 import io.siddhi.core.stream.output.sink.Sink;
 import io.siddhi.core.util.config.ConfigReader;
@@ -38,6 +39,8 @@ import io.siddhi.extension.io.s3.sink.internal.utils.S3Constants;
 import io.siddhi.query.api.definition.StreamDefinition;
 import org.apache.log4j.Logger;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -241,12 +244,11 @@ import java.util.concurrent.ExecutorService;
 )
 // for more information refer https://siddhi-io.github.io/siddhi/documentation/siddhi-5.x/query-guide-5.x/#sink
 public class S3Sink extends Sink {
-
     private static final Logger logger = Logger.getLogger(S3Sink.class);
 
+    private OptionHolder optionHolder;
     private SinkConfig config;
     private EventPublisher publisher;
-    private OptionHolder optionHolder;
 
     /**
      * Returns the list of classes which this sink can consume.
@@ -287,11 +289,10 @@ public class S3Sink extends Sink {
     @Override
     protected StateFactory init(StreamDefinition streamDefinition, OptionHolder optionHolder, ConfigReader configReader,
                                 SiddhiAppContext siddhiAppContext) {
+        logger.debug("Initializing the S3 sink connector.");
 
-        logger.info(">>>>>>>>>>>> Initializing the S3 sink connector...");
         this.optionHolder = optionHolder;
         this.config = this.buildConfig(optionHolder, streamDefinition);
-
         this.config.setStreamId(streamDefinition.getId());
         if (streamDefinition.getAnnotations().get(0).getAnnotations().size() > 0) {
             this.config.setMapType(streamDefinition.getAnnotations().get(0).getAnnotations().get(0).getElements().get(0).getValue());
@@ -324,6 +325,7 @@ public class S3Sink extends Sink {
     @Override
     public void connect() throws ConnectionUnavailableException {
         this.publisher = new EventPublisher(this.config, this.optionHolder);
+        logger.debug("Event publisher started.");
     }
 
     /**
@@ -332,7 +334,10 @@ public class S3Sink extends Sink {
      */
     @Override
     public void disconnect() {
-        // todo publish all queued events before shutdown
+        if (this.publisher != null) {
+            this.publisher.shutdown();
+            logger.debug("Event publisher shutdown.");
+        }
     }
 
     /**
@@ -393,17 +398,21 @@ public class S3Sink extends Sink {
                     config.setRotateScheduledIntervalMs(Integer.parseInt(
                             optionHolder.validateAndGetStaticValue(S3Constants.ROTATE_SCHEDULED_INTERVAL_MS)));
                     break;
+                case S3Constants.CONTENT_TYPE:
+                    config.setContentType(optionHolder.validateAndGetStaticValue(S3Constants.CONTENT_TYPE));
+                case S3Constants.BUCKET_ACL:
+                    config.setBucketAcl(optionHolder.validateAndGetStaticValue(S3Constants.BUCKET_ACL));
                 default:
                     // Ignore! Not a valid option.
             }
         });
 
         if (config.getBucketName() == null || config.getBucketName().isEmpty()) {
-            throw new IllegalArgumentException("Parameter 'bucket.name' is required");
+            throw new SiddhiAppCreationException("Parameter '" + S3Constants.BUCKET_NAME + "' is required");
         }
 
         if (!optionHolder.isOptionExists(S3Constants.OBJECT_PATH)) {
-            throw new IllegalArgumentException("Parameter 'object.path' is required");
+            throw new SiddhiAppCreationException("Parameter '" + S3Constants.OBJECT_PATH + "' is required");
         }
         return config;
     }
