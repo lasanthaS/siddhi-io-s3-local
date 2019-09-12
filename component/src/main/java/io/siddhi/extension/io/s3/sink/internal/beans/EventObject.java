@@ -21,22 +21,23 @@ package io.siddhi.extension.io.s3.sink.internal.beans;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public abstract class EventObject {
     private String objectPath;
     private List<Object> events;
-    private int offset;
     private String bucketName;
     private String contentType;
+    private String streamId;
+    private String mapType;
 
-    public EventObject(String bucketName, String objectPath, int offset, String contentType) {
+    public EventObject(String bucketName, String objectPath, String contentType, String streamId, String mapType) {
         this.bucketName = bucketName;
         this.objectPath = objectPath;
-        this.offset = offset;
         this.contentType = contentType;
         this.events = new ArrayList<>();
-
-        System.out.println(">>>>>>>>>>> EventObject created with offset: " + offset);
+        this.streamId = streamId;
+        this.mapType = mapType;
     }
 
     public String getBucketName() {
@@ -53,14 +54,6 @@ public abstract class EventObject {
 
     public void setObjectPath(String objectPath) {
         this.objectPath = objectPath;
-    }
-
-    public int getOffset() {
-        return offset;
-    }
-
-    public void setOffset(int offset) {
-        this.offset = offset;
     }
 
     public List<Object> getEvents() {
@@ -87,10 +80,28 @@ public abstract class EventObject {
         this.contentType = contentType;
     }
 
+    public String getStreamId() {
+        return streamId;
+    }
+
+    public void setStreamId(String streamId) {
+        this.streamId = streamId;
+    }
+
     @Override
     public String toString() {
-        return String.format("Event[offset=%s, path=%s, count=%s]", this.offset, this.objectPath, this.events.size());
+        return String.format("Event[path=%s, count=%s]", this.objectPath, this.events.size());
     }
 
     public abstract InputStream serialize();
+
+    public abstract String getObjectKey();
+
+    public String getMapType() {
+        return mapType;
+    }
+
+    public void setMapType(String mapType) {
+        this.mapType = mapType;
+    }
 }

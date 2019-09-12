@@ -31,6 +31,10 @@ public class SinkConfig {
     private int flushSize = -1;
     private int rotateIntetrvalMs = -1;
     private int rotateScheduledIntervalMs = -1;
+    private String streamId;
+    private String mapType;
+
+    private int metadataIndex = -1;
 
     private String contentType = "application/octet-stream";
 
@@ -123,5 +127,29 @@ public class SinkConfig {
 
     public void setContentType(String contentType) {
         this.contentType = contentType;
+    }
+
+    public String getStreamId() {
+        return streamId;
+    }
+
+    public void setStreamId(String streamId) {
+        this.streamId = streamId;
+    }
+
+    public String getMapType() {
+        return mapType;
+    }
+
+    public void setMapType(String mapType) {
+        this.mapType = mapType;
+    }
+
+    public int getMetadataIndex() {
+        return metadataIndex;
+    }
+
+    public void setMetadataIndex(int metadataIndex) {
+        this.metadataIndex = metadataIndex;
     }
 }

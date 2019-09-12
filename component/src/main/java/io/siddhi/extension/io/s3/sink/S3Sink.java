@@ -32,14 +32,37 @@ import io.siddhi.core.util.snapshot.state.State;
 import io.siddhi.core.util.snapshot.state.StateFactory;
 import io.siddhi.core.util.transport.DynamicOptions;
 import io.siddhi.core.util.transport.OptionHolder;
-import io.siddhi.extension.io.s3.sink.internal.utils.S3Constants;
-import io.siddhi.extension.io.s3.sink.internal.publisher.EventPublisher;
 import io.siddhi.extension.io.s3.sink.internal.beans.SinkConfig;
-import io.siddhi.extension.io.s3.sink.internal.utils.ServiceClient;
+import io.siddhi.extension.io.s3.sink.internal.publisher.EventPublisher;
+import io.siddhi.extension.io.s3.sink.internal.utils.S3Constants;
 import io.siddhi.query.api.definition.StreamDefinition;
+import org.apache.log4j.Logger;
+
+import java.util.concurrent.ExecutorService;
 
 /**
  * This is a sample class-level comment, explaining what the extension class does.
+ * <p>
+ * Annotation of Siddhi Extension.
+ * <pre><code>
+ * eg:-
+ * {@literal @}Extension(
+ * name = "The name of the extension",
+ * namespace = "The namespace of the extension",
+ * description = "The description of the extension (optional).",
+ * //Sink configurations
+ * parameters = {
+ * {@literal @}Parameter(name = "The name of the first parameter", type = "Supprted parameter types.
+ *                              eg:{DataType.STRING,DataType.INT, DataType.LONG etc},dynamic=false ,optinal=true/false ,
+ *                              if optional =true then assign default value according the type")
+ *   System parameter is used to define common extension wide
+ *              },
+ * examples = {
+ * {@literal @}Example({"Example of the first CustomExtension contain syntax and description.Here,
+ *                      Syntax describe default mapping for SourceMapper and description describes
+ *                      the output of according this syntax},
+ *                      }
+ * </code></pre>
  * <p>
  * Annotation of Siddhi Extension.
  * <pre><code>
@@ -200,6 +223,13 @@ import io.siddhi.query.api.definition.StreamDefinition;
                         optional = true,
                         defaultValue = "application/octet-stream",
                         dynamic = true
+                ),
+                @Parameter(
+                        name = "bucket.acl",
+                        type = DataType.STRING,
+                        description = "Access control list for the bucket",
+                        optional = true,
+                        defaultValue = " "
                 )
         },
         examples = {
@@ -212,8 +242,9 @@ import io.siddhi.query.api.definition.StreamDefinition;
 // for more information refer https://siddhi-io.github.io/siddhi/documentation/siddhi-5.x/query-guide-5.x/#sink
 public class S3Sink extends Sink {
 
+    private static final Logger logger = Logger.getLogger(S3Sink.class);
+
     private SinkConfig config;
-    private String mapType;
     private EventPublisher publisher;
     private OptionHolder optionHolder;
 
@@ -256,12 +287,14 @@ public class S3Sink extends Sink {
     @Override
     protected StateFactory init(StreamDefinition streamDefinition, OptionHolder optionHolder, ConfigReader configReader,
                                 SiddhiAppContext siddhiAppContext) {
-        this.optionHolder = optionHolder;
-        this.config = this.buildConfig(optionHolder);
 
+        logger.info(">>>>>>>>>>>> Initializing the S3 sink connector...");
+        this.optionHolder = optionHolder;
+        this.config = this.buildConfig(optionHolder, streamDefinition);
+
+        this.config.setStreamId(streamDefinition.getId());
         if (streamDefinition.getAnnotations().get(0).getAnnotations().size() > 0) {
-            // todo better to get this using keys instead of the indices.
-            this.mapType = streamDefinition.getAnnotations().get(0).getAnnotations().get(0).getElements().get(0).getValue();
+            this.config.setMapType(streamDefinition.getAnnotations().get(0).getAnnotations().get(0).getElements().get(0).getValue());
         }
         return null;
     }
@@ -321,7 +354,7 @@ public class S3Sink extends Sink {
         return null;
     }
 
-    private SinkConfig buildConfig(OptionHolder optionHolder) {
+    private SinkConfig buildConfig(OptionHolder optionHolder, StreamDefinition streamDefinition) {
         SinkConfig config = new SinkConfig();
         optionHolder.getStaticOptionsKeys().forEach(key -> {
             switch (key) {
@@ -361,7 +394,7 @@ public class S3Sink extends Sink {
                             optionHolder.validateAndGetStaticValue(S3Constants.ROTATE_SCHEDULED_INTERVAL_MS)));
                     break;
                 default:
-                    // Not an option
+                    // Ignore! Not a valid option.
             }
         });
 

@@ -22,17 +22,23 @@ import io.siddhi.core.util.transport.DynamicOptions;
 import io.siddhi.core.util.transport.OptionHolder;
 import io.siddhi.extension.io.s3.sink.internal.RotationStrategy;
 import io.siddhi.extension.io.s3.sink.internal.beans.SinkConfig;
-import io.siddhi.extension.io.s3.sink.internal.strategies.CountRotationStrategy;
+import io.siddhi.extension.io.s3.sink.internal.strategies.countbased.CountBasedRotationStrategy;
 import io.siddhi.extension.io.s3.sink.internal.utils.S3Constants;
 import io.siddhi.extension.io.s3.sink.internal.utils.ServiceClient;
+import org.apache.log4j.Logger;
 
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public class EventPublisher {
-    private final ServiceClient client;
-    RotationStrategy rotationStrategy;
+
+    private static final Logger logger = Logger.getLogger(EventPublisher.class);
+
+    private ServiceClient client;
+    private RotationStrategy rotationStrategy;
     private OptionHolder optionHolder;
     private SinkConfig config;
     private BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
@@ -41,15 +47,19 @@ public class EventPublisher {
         this.optionHolder = optionHolder;
         this.config = config;
         this.client = new ServiceClient(config);
-        this.rotationStrategy = new CountRotationStrategy(config, client, taskQueue);
+        this.rotationStrategy = new CountBasedRotationStrategy(config, client, taskQueue);
+
+        logger.info(this.rotationStrategy.getName() + " rotation strategy has been selected.");
 
         EventPublisherThreadPoolExecutor executor = new EventPublisherThreadPoolExecutor(
-                10, 20, 5000, TimeUnit.MILLISECONDS, this.taskQueue);
+                S3Constants.CORE_POOL_SIZE, S3Constants.MAX_POOL_SIZE, S3Constants.KEEP_ALIVE_TIME_MS,
+                TimeUnit.MILLISECONDS, this.taskQueue);
         executor.prestartAllCoreThreads();
     }
 
     public void publish(Object payload, DynamicOptions dynamicOptions) {
         String objectPath = optionHolder.validateAndGetOption(S3Constants.OBJECT_PATH).getValue(dynamicOptions);
+        logger.info("Queuing the event for publishing: " + payload);
         rotationStrategy.queueEvent(objectPath, payload);
     }
 }
