@@ -39,12 +39,29 @@ import io.siddhi.extension.io.s3.sink.internal.utils.S3Constants;
 import io.siddhi.query.api.definition.StreamDefinition;
 import org.apache.log4j.Logger;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-
 /**
  * This is a sample class-level comment, explaining what the extension class does.
+ * <p>
+ * Annotation of Siddhi Extension.
+ * <pre><code>
+ * eg:-
+ * {@literal @}Extension(
+ * name = "The name of the extension",
+ * namespace = "The namespace of the extension",
+ * description = "The description of the extension (optional).",
+ * //Sink configurations
+ * parameters = {
+ * {@literal @}Parameter(name = "The name of the first parameter", type = "Supprted parameter types.
+ *                              eg:{DataType.STRING,DataType.INT, DataType.LONG etc},dynamic=false ,optinal=true/false ,
+ *                              if optional =true then assign default value according the type")
+ *   System parameter is used to define common extension wide
+ *              },
+ * examples = {
+ * {@literal @}Example({"Example of the first CustomExtension contain syntax and description.Here,
+ *                      Syntax describe default mapping for SourceMapper and description describes
+ *                      the output of according this syntax},
+ *                      }
+ * </code></pre>
  * <p>
  * Annotation of Siddhi Extension.
  * <pre><code>

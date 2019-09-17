@@ -56,7 +56,7 @@ public class CountBasedRotationStrategy implements RotationStrategy {
 
             taskQueue.add(new PublisherTask(eventObject, client));
             eventObjectMap.replace(objectPath,
-                    new CountBasedEventObject(this.config, objectPath, getEventOffset(objectPath)));
+                    new CountBasedEventObject(objectPath, getEventOffset(objectPath)));
 
             logger.info("Queue contains " + taskQueue.size() + " tasks.");
         }
@@ -70,7 +70,7 @@ public class CountBasedRotationStrategy implements RotationStrategy {
     private CountBasedEventObject getOrCreateEventObject(String objectPath) {
         CountBasedEventObject eventObject = eventObjectMap.get(objectPath);
         if (eventObject == null) {
-            eventObject = new CountBasedEventObject(this.config, objectPath, getEventOffset(objectPath));
+            eventObject = new CountBasedEventObject(objectPath, getEventOffset(objectPath));
             eventObjectMap.put(objectPath, eventObject);
         }
         return eventObject;

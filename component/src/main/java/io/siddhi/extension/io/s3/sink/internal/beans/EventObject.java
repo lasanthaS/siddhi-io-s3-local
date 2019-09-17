@@ -24,22 +24,12 @@ import java.util.List;
 import java.util.Map;
 
 public abstract class EventObject {
-    protected SinkConfig config;
     protected String objectPath;
     protected List<Object> events;
 
-    public EventObject(SinkConfig config, String objectPath) {
-        this.config = config;
+    public EventObject(String objectPath) {
         this.objectPath = objectPath;
         this.events = new ArrayList<>();
-    }
-
-    public SinkConfig getConfig() {
-        return config;
-    }
-
-    public void setConfig(SinkConfig config) {
-        this.config = config;
     }
 
     public String getObjectPath() {
@@ -73,5 +63,5 @@ public abstract class EventObject {
 
     public abstract InputStream serialize();
 
-    public abstract String getObjectKey();
+    public abstract String getObjectKeySuffix();
 }

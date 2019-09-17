@@ -21,48 +21,61 @@ package io.siddhi.extension.io.s3.sink.internal.utils;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.AccessControlList;
 import com.amazonaws.services.s3.model.BucketVersioningConfiguration;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
+import com.amazonaws.services.s3.model.Grant;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.SetBucketVersioningConfigurationRequest;
 import io.siddhi.extension.io.s3.sink.internal.beans.EventObject;
 import io.siddhi.extension.io.s3.sink.internal.beans.SinkConfig;
+import io.siddhi.extension.io.s3.sink.internal.serializers.PayloadSerializer;
+import io.siddhi.extension.io.s3.sink.internal.serializers.TextSerializer;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
+import java.util.ServiceLoader;
 
 public class ServiceClient {
     private SinkConfig config;
     private AmazonS3 client;
+    private PayloadSerializer payloadSerializer;
 
     public ServiceClient(SinkConfig config) {
         this.config = config;
-        this.client = this.buildClient();
+        this.client = buildClient();
+        this.payloadSerializer = selectSerializer();
         this.createBucketIfNotExist();
+    }
+
+    private PayloadSerializer selectSerializer() {
+        ServiceLoader<PayloadSerializer> loader = ServiceLoader.load(PayloadSerializer.class);
+        for (PayloadSerializer serializer : loader) {
+            List<String> types = Arrays.asList(serializer.getTypes());
+            if (types.contains(config.getMapType())) {
+                return serializer;
+            }
+        }
+        return new TextSerializer();
     }
 
     private AmazonS3 buildClient() {
         AmazonS3ClientBuilder builder = AmazonS3ClientBuilder.standard()
                 .withRegion(config.getAwsRegion());
-        AWSCredentialsProvider credentialProvider = this.getCredentialProvider(true);
+        AWSCredentialsProvider credentialProvider = this.getCredentialProvider();
         if (credentialProvider != null) {
             builder.withCredentials(credentialProvider);
         }
         return builder.build();
     }
 
-    private AWSCredentialsProvider getCredentialProvider(boolean overrideForTesting) {
-        // todo remove this condition along with the parameter once the extension is completed
-        if (overrideForTesting) {
-            return new ProfileCredentialsProvider();
-        }
-
+    private AWSCredentialsProvider getCredentialProvider() {
         if (config.getCredentialProviderClass() != null) {
             try {
                 return (AWSCredentialsProvider) this.getClass().getClassLoader().loadClass(config.getCredentialProviderClass()).newInstance();
@@ -88,10 +101,11 @@ public class ServiceClient {
         }
 
         // Create the bucket.
-        CreateBucketRequest createBucketRequest = new CreateBucketRequest(config.getBucketName(), config.getAwsRegion());
+        CreateBucketRequest createBucketRequest = new CreateBucketRequest(
+                config.getBucketName(), config.getAwsRegion());
         AccessControlList acl = buildBucketACL();
         if (acl != null) {
-            createBucketRequest.withAccessControlList(acl);
+            createBucketRequest = createBucketRequest.withAccessControlList(acl);
         }
         this.client.createBucket(createBucketRequest);
 
@@ -105,10 +119,10 @@ public class ServiceClient {
     }
 
     public void uploadObject(EventObject eventObject) {
-        InputStream inputStream = eventObject.serialize();
+        InputStream inputStream = this.payloadSerializer.serialize(eventObject);
 
         ObjectMetadata metadata = new ObjectMetadata();
-        metadata.setContentType(eventObject.getConfig().getContentType());
+        metadata.setContentType(config.getContentType());
         try {
             metadata.setContentLength(inputStream.available());
         } catch (IOException e) {
@@ -116,7 +130,7 @@ public class ServiceClient {
         }
 
         PutObjectRequest putObjectRequest = new PutObjectRequest(
-                eventObject.getConfig().getBucketName(), buildKey(eventObject), inputStream, metadata);
+                config.getBucketName(), buildKey(eventObject), inputStream, metadata);
         if (config.getStorageClass() != null && !config.getStorageClass().isEmpty()) {
             putObjectRequest.setStorageClass(config.getStorageClass());
         }
@@ -124,11 +138,18 @@ public class ServiceClient {
     }
 
     private AccessControlList buildBucketACL() {
-        // todo build the bucket acl from the bucket.acl parameter
+        List<Grant> grants = ACLDeserializer.deserialize(config.getBucketAcl());
+        if (grants.size() > 0) {
+            AccessControlList acl = new AccessControlList();
+            acl.grantAllPermissions(grants.toArray(new Grant[0]));
+            return acl;
+        }
         return null;
     }
 
     private String buildKey(EventObject eventObject) {
-        return Paths.get(eventObject.getObjectPath(), eventObject.getObjectKey()).toString();
+        String key = String.format("%s-%s.%s", config.getStreamId(), eventObject.getObjectKeySuffix(),
+                this.payloadSerializer.getExtension());
+        return Paths.get(eventObject.getObjectPath(), key).toString();
     }
 }

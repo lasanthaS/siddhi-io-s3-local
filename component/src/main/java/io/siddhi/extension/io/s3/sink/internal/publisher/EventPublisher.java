@@ -23,7 +23,6 @@ import io.siddhi.core.util.transport.OptionHolder;
 import io.siddhi.extension.io.s3.sink.internal.RotationStrategy;
 import io.siddhi.extension.io.s3.sink.internal.beans.SinkConfig;
 import io.siddhi.extension.io.s3.sink.internal.strategies.countbased.CountBasedRotationStrategy;
-import io.siddhi.extension.io.s3.sink.internal.strategies.interval.IntervalBasedRotationStrategy;
 import io.siddhi.extension.io.s3.sink.internal.utils.S3Constants;
 import io.siddhi.extension.io.s3.sink.internal.utils.ServiceClient;
 import org.apache.log4j.Logger;
@@ -47,7 +46,7 @@ public class EventPublisher {
         this.optionHolder = optionHolder;
         this.config = config;
         this.client = new ServiceClient(config);
-        this.rotationStrategy = initRotationStrategy();
+        this.rotationStrategy = selectRotationStrategy();
 
         logger.info(this.rotationStrategy.getName() + " rotation strategy has been selected.");
 
@@ -70,7 +69,7 @@ public class EventPublisher {
         }
     }
 
-    private RotationStrategy initRotationStrategy() {
+    private RotationStrategy selectRotationStrategy() {
 //        if (this.config.getRotateIntetrvalMs() > -1) {
 //            return new IntervalBasedRotationStrategy(config, client, taskQueue);
 //        }
