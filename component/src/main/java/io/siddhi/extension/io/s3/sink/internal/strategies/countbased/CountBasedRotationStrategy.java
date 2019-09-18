@@ -20,9 +20,9 @@ package io.siddhi.extension.io.s3.sink.internal.strategies.countbased;
 
 import io.siddhi.extension.io.s3.sink.S3Sink;
 import io.siddhi.extension.io.s3.sink.internal.RotationStrategy;
+import io.siddhi.extension.io.s3.sink.internal.ServiceClient;
 import io.siddhi.extension.io.s3.sink.internal.beans.SinkConfig;
 import io.siddhi.extension.io.s3.sink.internal.publisher.PublisherTask;
-import io.siddhi.extension.io.s3.sink.internal.ServiceClient;
 import org.apache.log4j.Logger;
 
 import java.util.HashMap;
@@ -37,14 +37,24 @@ public class CountBasedRotationStrategy implements RotationStrategy {
     private ServiceClient client;
     private BlockingQueue<Runnable> taskQueue;
 
-    private Map<String, Integer> eventOffsetMap = new HashMap<>();
-    private Map<String, CountBasedEventObject> eventObjectMap = new HashMap<>();
+    private Map<String, Integer> eventOffsetMap;
+    private Map<String, CountBasedEventObject> eventObjectMap;
 
     @Override
-    public void init(SinkConfig config, ServiceClient client, BlockingQueue<Runnable> taskQueue) {
+    public void init(SinkConfig config, ServiceClient client, S3Sink.SinkState state) {
         this.config = config;
         this.client = client;
-        this.taskQueue = taskQueue;
+        this.taskQueue = state.getTaskQueue();
+        this.eventOffsetMap = (Map<String, Integer>) state.getStateMap("eventOffsetMap");
+        if (this.eventOffsetMap == null) {
+            this.eventOffsetMap = new HashMap<>();
+            state.setStateMaps("eventOffsetMap", this.eventOffsetMap);
+        }
+        this.eventObjectMap = (Map<String, CountBasedEventObject>) state.getStateMap("eventObjectMap");
+        if (this.eventObjectMap == null) {
+            this.eventObjectMap = new HashMap<>();
+            state.setStateMaps("eventObjectMap", this.eventObjectMap);
+        }
     }
 
     @Override

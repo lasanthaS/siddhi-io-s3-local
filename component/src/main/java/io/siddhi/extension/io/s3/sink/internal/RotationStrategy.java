@@ -21,11 +21,9 @@ package io.siddhi.extension.io.s3.sink.internal;
 import io.siddhi.extension.io.s3.sink.S3Sink;
 import io.siddhi.extension.io.s3.sink.internal.beans.SinkConfig;
 
-import java.util.concurrent.BlockingQueue;
-
 public interface RotationStrategy {
 
-    void init(SinkConfig config, ServiceClient client, BlockingQueue<Runnable> taskQueue);
+    void init(SinkConfig config, ServiceClient client, S3Sink.SinkState taskQueue);
 
     void queueEvent(String objectPath, Object event);
 

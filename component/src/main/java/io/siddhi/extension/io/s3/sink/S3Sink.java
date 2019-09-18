@@ -37,6 +37,11 @@ import io.siddhi.extension.io.s3.sink.internal.utils.S3Constants;
 import io.siddhi.query.api.definition.StreamDefinition;
 import org.apache.log4j.Logger;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
 /**
  * This is a sample class-level comment, explaining what the extension class does.
  * <p>
@@ -258,7 +263,7 @@ import org.apache.log4j.Logger;
         }
 )
 // for more information refer https://siddhi-io.github.io/siddhi/documentation/siddhi-5.x/query-guide-5.x/#sink
-public class S3Sink extends Sink {
+public class S3Sink extends Sink<S3Sink.SinkState> {
     private static final Logger logger = Logger.getLogger(S3Sink.class);
 
     private EventPublisher publisher;
@@ -300,12 +305,15 @@ public class S3Sink extends Sink {
      * @return StateFactory for the Function which contains logic for the updated state based on arrived events.
      */
     @Override
-    protected StateFactory init(StreamDefinition streamDefinition, OptionHolder optionHolder,
-                                ConfigReader configReader, SiddhiAppContext siddhiAppContext) {
+    protected StateFactory<SinkState> init(StreamDefinition streamDefinition, OptionHolder optionHolder,
+                                           ConfigReader configReader, SiddhiAppContext siddhiAppContext) {
         logger.debug("Initializing the S3 sink connector.");
+        SinkState state = new SinkState();
         SinkConfig config = new SinkConfig(optionHolder, streamDefinition);
-        this.publisher = new EventPublisher(config, optionHolder);
-        return null;
+
+        this.publisher = new EventPublisher(config, optionHolder, state);
+
+        return () -> state;
     }
 
     /**
@@ -318,9 +326,9 @@ public class S3Sink extends Sink {
      *                                        such that the  system will take care retrying for connection
      */
     @Override
-    public void publish(Object payload, DynamicOptions dynamicOptions, State state)
+    public void publish(Object payload, DynamicOptions dynamicOptions, SinkState state)
             throws ConnectionUnavailableException {
-        publisher.publish(payload, dynamicOptions);
+        publisher.publish(payload, dynamicOptions, state);
     }
 
     /**
@@ -365,5 +373,46 @@ public class S3Sink extends Sink {
     @Override
     protected ServiceDeploymentInfo exposeServiceDeploymentInfo() {
         return null;
+    }
+
+    public class SinkState extends State {
+        private BlockingQueue<Runnable> taskQueue;
+        private Map<String, Object> stateMaps;
+
+        public SinkState() {
+            this.taskQueue = new LinkedBlockingQueue<>();
+            this.stateMaps = new HashMap<>();
+        }
+
+        @Override
+        public boolean canDestroy() {
+            return false;
+        }
+
+        @Override
+        public Map<String, Object> snapshot() {
+            Map<String, Object> state = new HashMap<>();
+            state.put("taskQueue", taskQueue);
+            state.put("stateMaps", stateMaps);
+            return state;
+        }
+
+        @Override
+        public void restore(Map<String, Object> state) {
+            taskQueue = (BlockingQueue<Runnable>) state.get("taskQueue");
+            stateMaps = (Map<String, Object>) state.get("stateMaps");
+        }
+
+        public BlockingQueue<Runnable> getTaskQueue() {
+            return taskQueue;
+        }
+
+        public Object getStateMap(String key) {
+            return stateMaps.get(key);
+        }
+
+        public void setStateMaps(String key, Object map) {
+            stateMaps.put(key, map);
+        }
     }
 }

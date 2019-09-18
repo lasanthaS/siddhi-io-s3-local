@@ -42,17 +42,16 @@ public class EventPublisher {
     private ServiceClient client;
     private RotationStrategy rotationStrategy;
     private OptionHolder optionHolder;
-    private BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
     private EventPublisherThreadPoolExecutor executor;
 
-    public EventPublisher(SinkConfig config, OptionHolder optionHolder) {
+    public EventPublisher(SinkConfig config, OptionHolder optionHolder, S3Sink.SinkState state) {
         this.optionHolder = optionHolder;
         this.client = new ServiceClient(config);
         this.rotationStrategy = getRotationStrategy();
-        this.rotationStrategy.init(config, this.client, this.taskQueue);
+        this.rotationStrategy.init(config, this.client, state);
 
         this.executor = new EventPublisherThreadPoolExecutor(CORE_POOL_SIZE, MAX_POOL_SIZE, KEEP_ALIVE_TIME_MS,
-                TimeUnit.MILLISECONDS, this.taskQueue);
+                TimeUnit.MILLISECONDS, state.getTaskQueue());
     }
 
     public void start() {
@@ -60,7 +59,7 @@ public class EventPublisher {
         this.executor.prestartAllCoreThreads();
     }
 
-    public void publish(Object payload, DynamicOptions dynamicOptions) {
+    public void publish(Object payload, DynamicOptions dynamicOptions, S3Sink.SinkState state) {
         String objectPath = optionHolder.validateAndGetOption(S3Constants.OBJECT_PATH).getValue(dynamicOptions);
         logger.debug("Queuing the event for publishing: " + payload);
         rotationStrategy.queueEvent(objectPath, payload);

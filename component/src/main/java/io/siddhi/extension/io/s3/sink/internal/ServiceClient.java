@@ -53,6 +53,8 @@ public class ServiceClient {
         this.client = buildClient();
         this.serializer = getPayloadSerializer();
 
+        System.out.println(">>>>>>>>>>>>> init service client");
+
         // If the bucket is not available, create it.
         createBucketIfNotExist();
     }
@@ -104,6 +106,8 @@ public class ServiceClient {
     }
 
     private void createBucketIfNotExist() {
+        System.out.println(">>>>>>>>>>> create bucket");
+
         // NOTE: The bucket.acl and versioning.enabled flags will only be effective if the bucket is not available.
 
         // Check if the bucket exists. If so skip the rest of the code.
