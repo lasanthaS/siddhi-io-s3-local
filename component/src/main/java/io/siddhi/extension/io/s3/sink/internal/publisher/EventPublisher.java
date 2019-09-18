@@ -20,11 +20,12 @@ package io.siddhi.extension.io.s3.sink.internal.publisher;
 
 import io.siddhi.core.util.transport.DynamicOptions;
 import io.siddhi.core.util.transport.OptionHolder;
+import io.siddhi.extension.io.s3.sink.S3Sink;
 import io.siddhi.extension.io.s3.sink.internal.RotationStrategy;
 import io.siddhi.extension.io.s3.sink.internal.beans.SinkConfig;
 import io.siddhi.extension.io.s3.sink.internal.strategies.countbased.CountBasedRotationStrategy;
 import io.siddhi.extension.io.s3.sink.internal.utils.S3Constants;
-import io.siddhi.extension.io.s3.sink.internal.utils.ServiceClient;
+import io.siddhi.extension.io.s3.sink.internal.ServiceClient;
 import org.apache.log4j.Logger;
 
 import java.util.concurrent.BlockingQueue;
@@ -34,25 +35,28 @@ import java.util.concurrent.TimeUnit;
 public class EventPublisher {
 
     private static final Logger logger = Logger.getLogger(EventPublisher.class);
+    private static final int CORE_POOL_SIZE = 10;
+    private static final int MAX_POOL_SIZE = 20;
+    private static final int KEEP_ALIVE_TIME_MS = 5000;
 
     private ServiceClient client;
     private RotationStrategy rotationStrategy;
     private OptionHolder optionHolder;
-    private SinkConfig config;
     private BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
     private EventPublisherThreadPoolExecutor executor;
 
     public EventPublisher(SinkConfig config, OptionHolder optionHolder) {
         this.optionHolder = optionHolder;
-        this.config = config;
         this.client = new ServiceClient(config);
-        this.rotationStrategy = selectRotationStrategy();
+        this.rotationStrategy = getRotationStrategy();
+        this.rotationStrategy.init(config, this.client, this.taskQueue);
 
-        logger.info(this.rotationStrategy.getName() + " rotation strategy has been selected.");
-
-        this.executor = new EventPublisherThreadPoolExecutor(
-                S3Constants.CORE_POOL_SIZE, S3Constants.MAX_POOL_SIZE, S3Constants.KEEP_ALIVE_TIME_MS,
+        this.executor = new EventPublisherThreadPoolExecutor(CORE_POOL_SIZE, MAX_POOL_SIZE, KEEP_ALIVE_TIME_MS,
                 TimeUnit.MILLISECONDS, this.taskQueue);
+    }
+
+    public void start() {
+        logger.debug("Starting all core threads.");
         this.executor.prestartAllCoreThreads();
     }
 
@@ -63,21 +67,15 @@ public class EventPublisher {
     }
 
     public void shutdown() {
-        logger.info("Shutting down worker threads.");
-        if (this.executor != null) {
-            this.executor.shutdown();
+        logger.debug("Shutting down worker threads.");
+        if (executor != null) {
+            executor.shutdown();
         }
     }
 
-    private RotationStrategy selectRotationStrategy() {
-//        if (this.config.getRotateIntetrvalMs() > -1) {
-//            return new IntervalBasedRotationStrategy(config, client, taskQueue);
-//        }
-
-        // If the 'flush.size' is not set, make it 1 and initialize the count based strategy.
-        if (this.config.getFlushSize() == -1) {
-            this.config.setFlushSize(1);
-        }
-        return new CountBasedRotationStrategy(config, client, taskQueue);
+    private RotationStrategy getRotationStrategy() {
+        RotationStrategy strategy = new CountBasedRotationStrategy();
+        logger.debug(strategy.getName() + " rotation strategy is selected.");
+        return strategy;
     }
 }

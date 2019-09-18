@@ -18,10 +18,11 @@
 
 package io.siddhi.extension.io.s3.sink.internal.strategies.countbased;
 
+import io.siddhi.extension.io.s3.sink.S3Sink;
 import io.siddhi.extension.io.s3.sink.internal.RotationStrategy;
 import io.siddhi.extension.io.s3.sink.internal.beans.SinkConfig;
 import io.siddhi.extension.io.s3.sink.internal.publisher.PublisherTask;
-import io.siddhi.extension.io.s3.sink.internal.utils.ServiceClient;
+import io.siddhi.extension.io.s3.sink.internal.ServiceClient;
 import org.apache.log4j.Logger;
 
 import java.util.HashMap;
@@ -39,7 +40,8 @@ public class CountBasedRotationStrategy implements RotationStrategy {
     private Map<String, Integer> eventOffsetMap = new HashMap<>();
     private Map<String, CountBasedEventObject> eventObjectMap = new HashMap<>();
 
-    public CountBasedRotationStrategy(SinkConfig config, ServiceClient client, BlockingQueue<Runnable> taskQueue) {
+    @Override
+    public void init(SinkConfig config, ServiceClient client, BlockingQueue<Runnable> taskQueue) {
         this.config = config;
         this.client = client;
         this.taskQueue = taskQueue;
@@ -51,8 +53,9 @@ public class CountBasedRotationStrategy implements RotationStrategy {
         eventObject.addEvent(payload);
         incrementEventOffset(objectPath);
 
-        if (eventObject.getEventCount() % this.config.getFlushSize() == 0) {
-            logger.info("Queuing the event object with " + eventObject.getEventCount() + " events. Offset: " + eventObject.getOffset());
+        if (eventObject.getEventCount() % config.getFlushSize() == 0) {
+            logger.info("Queuing the event object with " + eventObject.getEventCount() + " events. Offset: " +
+                    eventObject.getOffset());
 
             taskQueue.add(new PublisherTask(eventObject, client));
             eventObjectMap.replace(objectPath,

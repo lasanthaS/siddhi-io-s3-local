@@ -19,7 +19,6 @@
 package io.siddhi.extension.io.s3.sink.internal.utils;
 
 public class S3Constants {
-
     // Sink parameters
     public static final String CREDENTIAL_PROVIDER_CLASS = "credential.provider.class";
     public static final String AWS_ACCESS_KEY = "aws.access.key";
@@ -35,8 +34,9 @@ public class S3Constants {
     public static final String CONTENT_TYPE = "content.type";
     public static final String BUCKET_ACL = "bucket.acl";
 
-    // Event publisher thread pool configs
-    public static final int CORE_POOL_SIZE = 10;
-    public static final int MAX_POOL_SIZE = 20;
-    public static final int KEEP_ALIVE_TIME_MS = 5000;
+    public static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
+
+    private S3Constants() {
+        // To prevent initialization of the class.
+    }
 }

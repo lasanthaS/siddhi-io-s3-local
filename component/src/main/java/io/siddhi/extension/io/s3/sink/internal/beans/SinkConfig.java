@@ -19,9 +19,14 @@
 package io.siddhi.extension.io.s3.sink.internal.beans;
 
 import com.amazonaws.regions.Regions;
+import com.amazonaws.services.s3.model.StorageClass;
+import io.siddhi.core.exception.SiddhiAppCreationException;
+import io.siddhi.core.util.transport.OptionHolder;
+import io.siddhi.extension.io.s3.sink.internal.utils.S3Constants;
+import io.siddhi.query.api.definition.StreamDefinition;
 
 public class SinkConfig {
-    private String storageClass = "standard";
+    private String storageClass = StorageClass.Standard.toString();
     private String credentialProviderClass = null;
     private String awsAccessKey = null;
     private String awsSecretKey = null;
@@ -29,122 +34,122 @@ public class SinkConfig {
     private String awsRegion = Regions.DEFAULT_REGION.getName();
     private String streamId;
     private String mapType;
-    private String contentType = "application/octet-stream";
+    private String contentType = S3Constants.DEFAULT_CONTENT_TYPE;
     private String bucketAcl = "";
     private int flushSize = -1;
-    private int rotateIntetrvalMs = -1;
-    private int rotateScheduledIntervalMs = -1;
     private boolean versioningEnabled = false;
+
+    public SinkConfig(OptionHolder optionHolder, StreamDefinition streamDefinition) {
+        optionHolder.getStaticOptionsKeys().forEach(key -> {
+            switch (key) {
+                case S3Constants.CREDENTIAL_PROVIDER_CLASS:
+                    credentialProviderClass =
+                            optionHolder.validateAndGetStaticValue(S3Constants.CREDENTIAL_PROVIDER_CLASS);
+                    break;
+                case S3Constants.AWS_ACCESS_KEY:
+                    awsAccessKey = optionHolder.validateAndGetStaticValue(S3Constants.AWS_ACCESS_KEY);
+                    break;
+                case S3Constants.AWS_SECRET_KEY:
+                    awsSecretKey = optionHolder.validateAndGetStaticValue(S3Constants.AWS_SECRET_KEY);
+                    break;
+                case S3Constants.AWS_REGION:
+                    awsRegion = optionHolder.validateAndGetStaticValue(S3Constants.AWS_REGION);
+                    break;
+                case S3Constants.BUCKET_NAME:
+                    bucketName = optionHolder.validateAndGetStaticValue(S3Constants.BUCKET_NAME);
+                    break;
+                case S3Constants.VERSIONING_ENABLED:
+                    versioningEnabled = Boolean.parseBoolean(
+                            optionHolder.validateAndGetStaticValue(S3Constants.VERSIONING_ENABLED));
+                    break;
+                case S3Constants.STORAGE_CLASS:
+                    storageClass = optionHolder.validateAndGetStaticValue(S3Constants.STORAGE_CLASS);
+                    break;
+                case S3Constants.FLUSH_SIZE:
+                    flushSize = Integer.parseInt(optionHolder.validateAndGetStaticValue(S3Constants.FLUSH_SIZE));
+                    break;
+                case S3Constants.CONTENT_TYPE:
+                    contentType = optionHolder.validateAndGetStaticValue(S3Constants.CONTENT_TYPE);
+                    break;
+                case S3Constants.BUCKET_ACL:
+                    bucketAcl = optionHolder.validateAndGetStaticValue(S3Constants.BUCKET_ACL);
+                    break;
+                default:
+                    // Ignore! Not a valid option.
+            }
+        });
+
+        if (bucketName == null || bucketName.isEmpty()) {
+            throw new SiddhiAppCreationException("Parameter '" + S3Constants.BUCKET_NAME + "' is required.");
+        }
+
+        if (!optionHolder.isOptionExists(S3Constants.OBJECT_PATH)) {
+            throw new SiddhiAppCreationException("Parameter '" + S3Constants.OBJECT_PATH + "' is required.");
+        }
+
+        if (flushSize <= 0) {
+            flushSize = 1;
+        }
+
+        // Get stream id and the map type from stream definition.
+        streamId = streamDefinition.getId();
+        mapType = streamDefinition.getAnnotations().stream()
+                .filter(e -> e.getName().equals("sink"))
+                .findFirst()
+                .get()
+                .getAnnotations()
+                .stream()
+                .filter(e -> e.getName().equals("map"))
+                .findFirst()
+                .map(a -> a.getElement("type"))
+                .orElseThrow(() -> new SiddhiAppCreationException("Sink mapper is required."));
+    }
 
     public String getStorageClass() {
         return storageClass;
-    }
-
-    public void setStorageClass(String storageClass) {
-        this.storageClass = storageClass;
     }
 
     public String getCredentialProviderClass() {
         return credentialProviderClass;
     }
 
-    public void setCredentialProviderClass(String credentialProviderClass) {
-        this.credentialProviderClass = credentialProviderClass;
-    }
-
     public String getAwsAccessKey() {
         return awsAccessKey;
-    }
-
-    public void setAwsAccessKey(String awsAccessKey) {
-        this.awsAccessKey = awsAccessKey;
     }
 
     public String getAwsSecretKey() {
         return awsSecretKey;
     }
 
-    public void setAwsSecretKey(String awsSecretKey) {
-        this.awsSecretKey = awsSecretKey;
-    }
-
     public String getBucketName() {
         return bucketName;
-    }
-
-    public void setBucketName(String bucketName) {
-        this.bucketName = bucketName;
     }
 
     public String getAwsRegion() {
         return awsRegion;
     }
 
-    public void setAwsRegion(String awsRegion) {
-        this.awsRegion = awsRegion;
-    }
-
     public String getStreamId() {
         return streamId;
-    }
-
-    public void setStreamId(String streamId) {
-        this.streamId = streamId;
     }
 
     public String getMapType() {
         return mapType;
     }
 
-    public void setMapType(String mapType) {
-        this.mapType = mapType;
-    }
-
     public String getContentType() {
         return contentType;
-    }
-
-    public void setContentType(String contentType) {
-        this.contentType = contentType;
     }
 
     public String getBucketAcl() {
         return bucketAcl;
     }
 
-    public void setBucketAcl(String bucketAcl) {
-        this.bucketAcl = bucketAcl;
-    }
-
     public int getFlushSize() {
         return flushSize;
     }
 
-    public void setFlushSize(int flushSize) {
-        this.flushSize = flushSize;
-    }
-
-    public int getRotateIntetrvalMs() {
-        return rotateIntetrvalMs;
-    }
-
-    public void setRotateIntetrvalMs(int rotateIntetrvalMs) {
-        this.rotateIntetrvalMs = rotateIntetrvalMs;
-    }
-
-    public int getRotateScheduledIntervalMs() {
-        return rotateScheduledIntervalMs;
-    }
-
-    public void setRotateScheduledIntervalMs(int rotateScheduledIntervalMs) {
-        this.rotateScheduledIntervalMs = rotateScheduledIntervalMs;
-    }
-
     public boolean isVersioningEnabled() {
         return versioningEnabled;
-    }
-
-    public void setVersioningEnabled(boolean versioningEnabled) {
-        this.versioningEnabled = versioningEnabled;
     }
 }

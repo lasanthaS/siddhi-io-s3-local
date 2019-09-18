@@ -19,14 +19,8 @@
 package io.siddhi.extension.io.s3.sink.internal.strategies.countbased;
 
 import io.siddhi.extension.io.s3.sink.internal.beans.EventObject;
-import org.apache.log4j.Logger;
-
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 
 public class CountBasedEventObject extends EventObject {
-    private static final Logger logger = Logger.getLogger(CountBasedEventObject.class);
-
     private int offset;
 
     public CountBasedEventObject(String objectPath, int offset) {
@@ -35,20 +29,13 @@ public class CountBasedEventObject extends EventObject {
     }
 
     @Override
-    public InputStream serialize() {
-        StringBuilder sb = new StringBuilder();
-        this.events.forEach(e -> sb.append(e.toString()).append("\n"));
-        return new ByteArrayInputStream(sb.toString().getBytes());
-    }
-
-    @Override
     public String toString() {
-        return String.format("Event[offset=%d, path=%s, count=%s]", this.offset, this.objectPath, this.getEventCount());
+        return String.format("Event[offset=%d, path=%s, count=%s]", offset, objectPath, events.size());
     }
 
     @Override
     public String getObjectKeySuffix() {
-        return String.format("-%s", this.offset);
+        return Integer.toString(offset);
     }
 
     public int getOffset() {

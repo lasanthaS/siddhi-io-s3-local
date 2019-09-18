@@ -23,9 +23,7 @@ import io.siddhi.annotation.Extension;
 import io.siddhi.annotation.Parameter;
 import io.siddhi.annotation.util.DataType;
 import io.siddhi.core.config.SiddhiAppContext;
-import io.siddhi.core.event.Event;
 import io.siddhi.core.exception.ConnectionUnavailableException;
-import io.siddhi.core.exception.SiddhiAppCreationException;
 import io.siddhi.core.stream.ServiceDeploymentInfo;
 import io.siddhi.core.stream.output.sink.Sink;
 import io.siddhi.core.util.config.ConfigReader;
@@ -222,20 +220,20 @@ import org.apache.log4j.Logger;
                         optional = true,
                         defaultValue = "1"
                 ),
-                @Parameter(
-                        name = "rotate.interval.ms",
-                        type = DataType.INT,
-                        description = "Maximum span of event time",
-                        optional = true,
-                        defaultValue = "-1"
-                ),
-                @Parameter(
-                        name = "rotate.scheduled.interval.ms",
-                        type = DataType.INT,
-                        description = "Maximum span of event time from the first event",
-                        optional = true,
-                        defaultValue = "-1"
-                ),
+//                @Parameter(
+//                        name = "rotate.interval.ms",
+//                        type = DataType.INT,
+//                        description = "Maximum span of event time",
+//                        optional = true,
+//                        defaultValue = "-1"
+//                ),
+//                @Parameter(
+//                        name = "rotate.scheduled.interval.ms",
+//                        type = DataType.INT,
+//                        description = "Maximum span of event time from the first event",
+//                        optional = true,
+//                        defaultValue = "-1"
+//                ),
                 @Parameter(
                         name = "content.type",
                         type = DataType.STRING,
@@ -263,8 +261,6 @@ import org.apache.log4j.Logger;
 public class S3Sink extends Sink {
     private static final Logger logger = Logger.getLogger(S3Sink.class);
 
-    private OptionHolder optionHolder;
-    private SinkConfig config;
     private EventPublisher publisher;
 
     /**
@@ -277,7 +273,7 @@ public class S3Sink extends Sink {
      */
     @Override
     public Class[] getSupportedInputEventClasses() {
-        return new Class[]{String.class, Event.class};
+        return new Class[]{String.class};
     }
 
     /**
@@ -304,16 +300,11 @@ public class S3Sink extends Sink {
      * @return StateFactory for the Function which contains logic for the updated state based on arrived events.
      */
     @Override
-    protected StateFactory init(StreamDefinition streamDefinition, OptionHolder optionHolder, ConfigReader configReader,
-                                SiddhiAppContext siddhiAppContext) {
+    protected StateFactory init(StreamDefinition streamDefinition, OptionHolder optionHolder,
+                                ConfigReader configReader, SiddhiAppContext siddhiAppContext) {
         logger.debug("Initializing the S3 sink connector.");
-
-        this.optionHolder = optionHolder;
-        this.config = this.buildConfig(optionHolder, streamDefinition);
-        this.config.setStreamId(streamDefinition.getId());
-        if (streamDefinition.getAnnotations().get(0).getAnnotations().size() > 0) {
-            this.config.setMapType(streamDefinition.getAnnotations().get(0).getAnnotations().get(0).getElements().get(0).getValue());
-        }
+        SinkConfig config = new SinkConfig(optionHolder, streamDefinition);
+        this.publisher = new EventPublisher(config, optionHolder);
         return null;
     }
 
@@ -329,7 +320,7 @@ public class S3Sink extends Sink {
     @Override
     public void publish(Object payload, DynamicOptions dynamicOptions, State state)
             throws ConnectionUnavailableException {
-        this.publisher.publish(payload, dynamicOptions);
+        publisher.publish(payload, dynamicOptions);
     }
 
     /**
@@ -341,7 +332,7 @@ public class S3Sink extends Sink {
      */
     @Override
     public void connect() throws ConnectionUnavailableException {
-        this.publisher = new EventPublisher(this.config, this.optionHolder);
+        publisher.start();
         logger.debug("Event publisher started.");
     }
 
@@ -351,8 +342,8 @@ public class S3Sink extends Sink {
      */
     @Override
     public void disconnect() {
-        if (this.publisher != null) {
-            this.publisher.shutdown();
+        if (publisher != null) {
+            publisher.shutdown();
             logger.debug("Event publisher shutdown.");
         }
     }
@@ -374,63 +365,5 @@ public class S3Sink extends Sink {
     @Override
     protected ServiceDeploymentInfo exposeServiceDeploymentInfo() {
         return null;
-    }
-
-    private SinkConfig buildConfig(OptionHolder optionHolder, StreamDefinition streamDefinition) {
-        SinkConfig config = new SinkConfig();
-        optionHolder.getStaticOptionsKeys().forEach(key -> {
-            switch (key) {
-                case S3Constants.CREDENTIAL_PROVIDER_CLASS:
-                    config.setCredentialProviderClass(
-                            optionHolder.validateAndGetStaticValue(S3Constants.CREDENTIAL_PROVIDER_CLASS));
-                    break;
-                case S3Constants.AWS_ACCESS_KEY:
-                    config.setAwsAccessKey(optionHolder.validateAndGetStaticValue(S3Constants.AWS_ACCESS_KEY));
-                    break;
-                case S3Constants.AWS_SECRET_KEY:
-                    config.setAwsSecretKey(optionHolder.validateAndGetStaticValue(S3Constants.AWS_SECRET_KEY));
-                    break;
-                case S3Constants.AWS_REGION:
-                    config.setAwsRegion(optionHolder.validateAndGetStaticValue(S3Constants.AWS_REGION));
-                    break;
-                case S3Constants.BUCKET_NAME:
-                    config.setBucketName(optionHolder.validateAndGetStaticValue(S3Constants.BUCKET_NAME));
-                    break;
-                case S3Constants.VERSIONING_ENABLED:
-                    config.setVersioningEnabled(Boolean.parseBoolean(
-                            optionHolder.validateAndGetStaticValue(S3Constants.VERSIONING_ENABLED)));
-                    break;
-                case S3Constants.STORAGE_CLASS:
-                    config.setStorageClass(optionHolder.validateAndGetStaticValue(S3Constants.STORAGE_CLASS));
-                    break;
-                case S3Constants.FLUSH_SIZE:
-                    config.setFlushSize(Integer.parseInt(
-                            optionHolder.validateAndGetStaticValue(S3Constants.FLUSH_SIZE)));
-                    break;
-                case S3Constants.ROTATE_INTERVAL_MS:
-                    config.setRotateIntetrvalMs(Integer.parseInt(
-                            optionHolder.validateAndGetStaticValue(S3Constants.ROTATE_INTERVAL_MS)));
-                    break;
-                case S3Constants.ROTATE_SCHEDULED_INTERVAL_MS:
-                    config.setRotateScheduledIntervalMs(Integer.parseInt(
-                            optionHolder.validateAndGetStaticValue(S3Constants.ROTATE_SCHEDULED_INTERVAL_MS)));
-                    break;
-                case S3Constants.CONTENT_TYPE:
-                    config.setContentType(optionHolder.validateAndGetStaticValue(S3Constants.CONTENT_TYPE));
-                case S3Constants.BUCKET_ACL:
-                    config.setBucketAcl(optionHolder.validateAndGetStaticValue(S3Constants.BUCKET_ACL));
-                default:
-                    // Ignore! Not a valid option.
-            }
-        });
-
-        if (config.getBucketName() == null || config.getBucketName().isEmpty()) {
-            throw new SiddhiAppCreationException("Parameter '" + S3Constants.BUCKET_NAME + "' is required");
-        }
-
-        if (!optionHolder.isOptionExists(S3Constants.OBJECT_PATH)) {
-            throw new SiddhiAppCreationException("Parameter '" + S3Constants.OBJECT_PATH + "' is required");
-        }
-        return config;
     }
 }

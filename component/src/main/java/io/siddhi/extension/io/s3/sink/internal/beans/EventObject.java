@@ -18,10 +18,8 @@
 
 package io.siddhi.extension.io.s3.sink.internal.beans;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 public abstract class EventObject {
     protected String objectPath;
@@ -36,16 +34,8 @@ public abstract class EventObject {
         return objectPath;
     }
 
-    public void setObjectPath(String objectPath) {
-        this.objectPath = objectPath;
-    }
-
     public List<Object> getEvents() {
         return events;
-    }
-
-    public void setEvents(List<Object> events) {
-        this.events = events;
     }
 
     public void addEvent(Object event) {
@@ -58,10 +48,8 @@ public abstract class EventObject {
 
     @Override
     public String toString() {
-        return String.format("Event[path=%s, count=%s]", this.objectPath, this.events.size());
+        return String.format("Event[path=%s, count=%s]", objectPath, events.size());
     }
-
-    public abstract InputStream serialize();
 
     public abstract String getObjectKeySuffix();
 }

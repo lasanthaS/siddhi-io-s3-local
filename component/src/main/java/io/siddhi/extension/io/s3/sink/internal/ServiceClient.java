@@ -16,7 +16,7 @@
  *  under the License.
  */
 
-package io.siddhi.extension.io.s3.sink.internal.utils;
+package io.siddhi.extension.io.s3.sink.internal;
 
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
@@ -34,6 +34,7 @@ import io.siddhi.extension.io.s3.sink.internal.beans.EventObject;
 import io.siddhi.extension.io.s3.sink.internal.beans.SinkConfig;
 import io.siddhi.extension.io.s3.sink.internal.serializers.PayloadSerializer;
 import io.siddhi.extension.io.s3.sink.internal.serializers.TextSerializer;
+import io.siddhi.extension.io.s3.sink.internal.utils.ACLDeserializer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,30 +46,40 @@ import java.util.ServiceLoader;
 public class ServiceClient {
     private SinkConfig config;
     private AmazonS3 client;
-    private PayloadSerializer payloadSerializer;
+    private PayloadSerializer serializer;
 
     public ServiceClient(SinkConfig config) {
         this.config = config;
         this.client = buildClient();
-        this.payloadSerializer = selectSerializer();
-        this.createBucketIfNotExist();
+        this.serializer = getPayloadSerializer();
+
+        // If the bucket is not available, create it.
+        createBucketIfNotExist();
     }
 
-    private PayloadSerializer selectSerializer() {
-        ServiceLoader<PayloadSerializer> loader = ServiceLoader.load(PayloadSerializer.class);
-        for (PayloadSerializer serializer : loader) {
-            List<String> types = Arrays.asList(serializer.getTypes());
-            if (types.contains(config.getMapType())) {
-                return serializer;
-            }
+    public void uploadObject(EventObject eventObject) {
+        InputStream inputStream = serializer.serialize(eventObject);
+
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentType(config.getContentType());
+        try {
+            metadata.setContentLength(inputStream.available());
+        } catch (IOException e) {
+            // Ignore setting content length
         }
-        return new TextSerializer();
+
+        PutObjectRequest putObjectRequest = new PutObjectRequest(
+                config.getBucketName(), buildKey(eventObject), inputStream, metadata);
+        if (config.getStorageClass() != null && !config.getStorageClass().isEmpty()) {
+            putObjectRequest.setStorageClass(config.getStorageClass());
+        }
+        client.putObject(putObjectRequest);
     }
 
     private AmazonS3 buildClient() {
         AmazonS3ClientBuilder builder = AmazonS3ClientBuilder.standard()
                 .withRegion(config.getAwsRegion());
-        AWSCredentialsProvider credentialProvider = this.getCredentialProvider();
+        AWSCredentialsProvider credentialProvider = getCredentialProvider();
         if (credentialProvider != null) {
             builder.withCredentials(credentialProvider);
         }
@@ -92,11 +103,11 @@ public class ServiceClient {
         return null;
     }
 
-    public void createBucketIfNotExist() {
+    private void createBucketIfNotExist() {
         // NOTE: The bucket.acl and versioning.enabled flags will only be effective if the bucket is not available.
 
         // Check if the bucket exists. If so skip the rest of the code.
-        if (this.client.doesBucketExistV2(config.getBucketName())) {
+        if (client.doesBucketExistV2(config.getBucketName())) {
             return;
         }
 
@@ -107,34 +118,15 @@ public class ServiceClient {
         if (acl != null) {
             createBucketRequest = createBucketRequest.withAccessControlList(acl);
         }
-        this.client.createBucket(createBucketRequest);
+        client.createBucket(createBucketRequest);
 
         // Enable versioning only if the config flag is set.
         if (config.isVersioningEnabled()) {
             SetBucketVersioningConfigurationRequest bucketVersioningConfigurationRequest =
                     new SetBucketVersioningConfigurationRequest(config.getBucketName(),
                             new BucketVersioningConfiguration().withStatus(BucketVersioningConfiguration.ENABLED));
-            this.client.setBucketVersioningConfiguration(bucketVersioningConfigurationRequest);
+            client.setBucketVersioningConfiguration(bucketVersioningConfigurationRequest);
         }
-    }
-
-    public void uploadObject(EventObject eventObject) {
-        InputStream inputStream = this.payloadSerializer.serialize(eventObject);
-
-        ObjectMetadata metadata = new ObjectMetadata();
-        metadata.setContentType(config.getContentType());
-        try {
-            metadata.setContentLength(inputStream.available());
-        } catch (IOException e) {
-            // Ignore setting content length
-        }
-
-        PutObjectRequest putObjectRequest = new PutObjectRequest(
-                config.getBucketName(), buildKey(eventObject), inputStream, metadata);
-        if (config.getStorageClass() != null && !config.getStorageClass().isEmpty()) {
-            putObjectRequest.setStorageClass(config.getStorageClass());
-        }
-        this.client.putObject(putObjectRequest);
     }
 
     private AccessControlList buildBucketACL() {
@@ -149,7 +141,20 @@ public class ServiceClient {
 
     private String buildKey(EventObject eventObject) {
         String key = String.format("%s-%s.%s", config.getStreamId(), eventObject.getObjectKeySuffix(),
-                this.payloadSerializer.getExtension());
+                serializer.getExtension());
         return Paths.get(eventObject.getObjectPath(), key).toString();
+    }
+
+    private PayloadSerializer getPayloadSerializer() {
+        ServiceLoader<PayloadSerializer> loader = ServiceLoader.load(PayloadSerializer.class);
+        for (PayloadSerializer serializer : loader) {
+            List<String> types = Arrays.asList(serializer.getTypes());
+            if (types.contains(config.getMapType())) {
+                return serializer;
+            }
+        }
+
+        // If no serializer is found, use text serializer as default.
+        return new TextSerializer();
     }
 }
